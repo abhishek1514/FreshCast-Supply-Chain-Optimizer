@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: restaurant-supply-chain-optimizer
+    runtime: docker
+    plan: starter
+    healthCheckPath: /_stcore/health

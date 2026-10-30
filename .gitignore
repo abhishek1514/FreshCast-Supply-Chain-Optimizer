@@ -1,0 +1,18 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+.env
+.streamlit/secrets.toml
+.DS_Store
+
+# Temporary development files
+app.py.backup
+add_forecast_section.py
+add_forecast_demand.py
+fix_forecast_script.py
+verify_app.py
+
+# Raw public datasets
+data/public/*.zip
+data/public/extracted/
