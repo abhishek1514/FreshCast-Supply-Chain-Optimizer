@@ -1,93 +1,213 @@
-# Restaurant Distributor Supply Chain Optimizer
+# FreshCast — Restaurant Supply Chain Optimizer
 
-A deployable Streamlit decision-support application for allocating product inventory from candidate warehouses to restaurants. It adapts the original repository's useful **fixed-cost + variable-cost mixed-integer optimization** approach from plant location to warehouse selection and restaurant distribution.
+A Python-based decision-support application for restaurant distributors that combines historical demand analysis with warehouse-to-restaurant distribution optimization.
 
-> **Data integrity:** no operational dataset is bundled. Existing original manufacturing Excel files are retained for reference but are not used by this restaurant-distributor app. Public datasets can inform demand analysis; they do not establish real warehouse costs, inventory, capacities or transport rates. Do not use unverified assumptions for live dispatch decisions.
+**Built with:** Python · Pandas · Streamlit · PuLP · Mixed-Integer Linear Programming
 
-## Features
+## Project Overview
 
-- CSV/XLSX ingestion for six input tables.
-- Structural, numeric, duplicate-key and foreign-key validation.
-- Warehouse open/close binary decisions with fixed operating costs.
-- Shipment allocation by warehouse, restaurant and SKU.
-- Hard constraints for restaurant demand, per-SKU stock and total warehouse capacity.
-- Shipping and handling costs, capacity utilization and downloadable CSV outputs.
-- Unit policy: quantities for each SKU must be normalized to one declared base unit before upload.
-- Automated tests, Docker image and Render deployment configuration.
+FreshCast helps demonstrate how restaurant demand information and operational supply-chain data can support warehouse selection and product distribution planning.
 
-## Run locally
+The application provides:
+- Historical restaurant order analysis and a baseline forecast demonstration.
+- Optional conversion of historical sales into SKU-level demand using documented product or recipe mappings.
+- Input validation for warehouse, restaurant, product, demand, inventory and shipping data.
+- Cost-minimizing warehouse selection and shipment allocation.
+- Interactive Streamlit dashboard with downloadable optimization results.
 
-Python 3.11+ (3.12 recommended).
+## Key Features
+
+### 1. Historical Demand Analysis
+- Processes historical restaurant order records.
+- Aggregates orders into monthly restaurant-level demand.
+- Provides a previous-month baseline forecast demonstration.
+- Clearly identifies the bundled July 2021 forecast as historical, not live.
+
+### 2. Demand Conversion
+- Supports historical sales-to-demand conversion.
+- Supports restaurant/SKU BOM mapping for forecast-to-ingredient demand demonstration.
+- Requires documented conversion factors and normalized product units.
+- Generates a downloadable `demand.csv`.
+
+### 3. Supply Chain Optimization
+- Selects warehouses using binary open/close decisions.
+- Allocates product quantities from warehouses to restaurants.
+- Minimizes fixed warehouse, shipping and handling costs.
+- Enforces demand fulfillment, stock availability and warehouse capacity constraints.
+- Reports infeasible optimization scenarios with actionable errors.
+
+### 4. Interactive Dashboard
+- Upload CSV/XLSX input files.
+- Validate and preview input tables.
+- Run the optimization model.
+- View cost breakdown and warehouse utilization.
+- Download shipment allocations and warehouse summaries.
+
+## System Architecture
+
+```mermaid
+flowchart TD
+    A["Historical Restaurant Orders"] --> B["Data Cleaning & Aggregation"]
+    B --> C["Monthly Demand Analysis"]
+    C --> D["Baseline Forecast Demonstration"]
+    D --> E["Optional BOM / Recipe Mapping"]
+    E --> F["Estimated SKU Demand CSV"]
+
+    G["Warehouse Data"] --> H["Streamlit Application"]
+    I["Restaurant & Product Data"] --> H
+    F --> H
+    J["Inventory & Shipping Costs"] --> H
+
+    H --> K["Input Validation"]
+    K --> L["PuLP Optimization Model"]
+    L --> M["Warehouse Selection"]
+    L --> N["Shipment Allocation"]
+    M --> O["Cost & Utilization Summary"]
+    N --> O
+    O --> P["Downloadable CSV Results"]
+```
+
+**Note:** The historical forecast and BOM conversion are demonstration workflows. The generated demand CSV is uploaded separately into the optimizer; this is not yet a fully automated end-to-end pipeline.
+
+## Optimization Model
+
+The objective is to minimize:
+
+`Total Cost = Fixed Warehouse Cost + Shipping Cost + Handling Cost`
+
+Subject to:
+- All restaurant-SKU demand must be fulfilled.
+- Shipment quantities cannot exceed warehouse SKU inventory.
+- Total outbound quantity cannot exceed warehouse capacity.
+- Only active warehouses can be selected.
+- Shipment allocation is allowed only on supplied warehouse-to-restaurant shipping lanes.
+
+The model uses PuLP with a mixed-integer linear programming formulation and the CBC solver.
+
+## Required Input Data
+
+| Input file | Purpose |
+|---|---|
+| `warehouses.csv` | Warehouse capacity, fixed cost and active status |
+| `restaurants.csv` | Restaurant destinations |
+| `products.csv` | SKU and base-unit definitions |
+| `demand.csv` | Required quantity per restaurant and SKU |
+| `inventory.csv` | Warehouse-level SKU stock and handling cost |
+| `shipping_costs.csv` | Shipping cost per base unit and delivery lane |
+
+All six input tables must use a consistent planning period and currency. Product quantities must be normalized to the declared base unit.
+
+## Technology Stack
+
+- **Language:** Python
+- **Data Processing:** Pandas
+- **Optimization:** PuLP, Mixed-Integer Linear Programming
+- **Dashboard:** Streamlit
+- **Data Formats:** CSV, Excel
+- **Testing:** Pytest
+- **Version Control:** Git and GitHub
+- **Containerization:** Docker configuration included
+
+## Run Locally
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/abhishek1514/FreshCast-Supply-Chain-Optimizer.git
+cd FreshCast-Supply-Chain-Optimizer
+```
+
+### 2. Create a virtual environment
 
 ```bash
 python -m venv .venv
-# Windows PowerShell
+```
+
+Windows PowerShell:
+
+```powershell
 .venv\Scripts\Activate.ps1
-# macOS/Linux: source .venv/bin/activate
+```
+
+### 3. Install dependencies
+
+```bash
 python -m pip install -r requirements.txt
+```
+
+### 4. Run the application
+
+```bash
 streamlit run app.py
 ```
 
-Open the local URL printed by Streamlit, usually `http://localhost:8501`.
+Open `http://localhost:8501` in your browser.
 
-## Input tables
-
-Download blank templates in the app, or use the CSV headers below. All tables must describe the same planning period and currency.
-
-| File/table | Required columns | Meaning |
-|---|---|---|
-| `warehouses` | `warehouse_id, warehouse_name, capacity_base_units, fixed_cost_per_period, active` | Total handling/dispatch capacity in normalized units for the period; fixed cost to operate a warehouse for the same period; whether it can be selected |
-| `restaurants` | `restaurant_id, restaurant_name, region` | Delivery destinations |
-| `products` | `sku, product_name, base_unit` | Product master; e.g. kg, L, piece or case |
-| `demand` | `restaurant_id, sku, demand_qty_base_units` | Required quantity by restaurant and SKU |
-| `inventory` | `warehouse_id, sku, available_qty_base_units, handling_cost_per_base_unit` | Available stock and handling cost |
-| `shipping_costs` | `warehouse_id, restaurant_id, cost_per_base_unit` | Cost to ship one base unit along a warehouse-restaurant lane |
-
-### Mixed inventory units
-
-The model does not guess unit conversions. Normalize quantities before upload. For example, if a SKU's base unit is `kg`, convert 500 g to 0.5 kg; if a SKU's base unit is `piece`, do not upload case counts as pieces unless you have applied the verified pack-size conversion. For the same SKU, inventory and demand must use the same base unit. Currency and cost period must also be consistent.
-
-### Cost objective
-
-`total cost = selected warehouse fixed costs + shipping cost + handling cost`.
-
-The model requires all demand to be met. It cannot silently drop demand. If stock/capacity/shipping lanes make the model infeasible, it reports an actionable error. Current model assumes deterministic demand, known stock/costs, no spoilage, no minimum order quantity, no time windows and no multi-period inventory carry-over.
-
-## Tests
+## Run Tests
 
 ```bash
-pytest -q
+python -m pytest -q
 ```
 
-Tests use tiny explicitly artificial fixtures to verify model behavior. They are not operational or public business data.
+The current test suite contains 8 passing tests covering optimization, demand conversion and input validation.
 
-## Docker
+## Project Structure
 
-```bash
-docker build -t restaurant-supply-chain-optimizer .
-docker run --rm -p 8501:8501 restaurant-supply-chain-optimizer
+```text
+FreshCast-Supply-Chain-Optimizer/
+│
+├── app.py
+├── app/
+│   ├── io.py
+│   ├── optimizer.py
+│   ├── public_demand.py
+│   └── schema.py
+│
+├── data/
+│   ├── public/
+│   └── templates/
+│
+├── docs/
+│   ├── DATA_SOURCES.md
+│   └── PUBLIC_DATA_MAPPING.md
+│
+├── tests/
+│   ├── test_optimizer.py
+│   ├── test_public_demand.py
+│   └── test_schema.py
+│
+├── requirements.txt
+├── Dockerfile
+├── render.yaml
+└── README.md
 ```
 
-Then open `http://localhost:8501`.
+## Data Sources and Limitations
 
-## Deploy on Render
+The public restaurant order dataset covers January 2019 to June 2021. Its bundled forecast is a historical demonstration for July 2021, not a current forecast.
 
-1. Push this repository to your Git provider.
-2. In Render, create a new **Blueprint** from the repository (or create a Docker web service).
-3. Render reads `render.yaml` and builds the Dockerfile.
-4. Wait for the `/_stcore/health` health check to pass.
-5. Open the service URL and upload all six verified input tables.
+Restaurant order counts do not directly represent ingredient quantities. A documented recipe/BOM mapping is needed to estimate SKU-level demand.
 
-The repository contains no secrets. If you later add a database or API key, keep secrets in the host's environment variables, not in Git. This starter app is unauthenticated and should not be exposed as a multi-tenant production service until authentication, authorization, upload limits, persistent audit logs and operational monitoring are added.
+The optimizer requires verified operational inputs for inventory, warehouse capacity, fixed costs, handling costs and shipping rates. These values must be provided by the operator; the public dataset does not establish them.
 
-## Public data sources
+The current model assumes deterministic demand and known operational inputs. It does not currently model spoilage, delivery time windows, minimum order quantities or multi-period inventory carry-over.
 
-See [`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md). Public historical restaurant orders can support demand analysis, but do not provide a complete verified set of distributor inventory, warehouse capacity, freight and fixed costs. The app therefore accepts public or business data without misrepresenting missing cost data as real.
+## Future Improvements
 
-## Original project
+- Integrate forecasting and optimization into one automated workflow.
+- Evaluate forecasting models at restaurant level.
+- Add real-time operational data integration.
+- Introduce multi-period inventory planning.
+- Add delivery lead-time and route constraints.
+- Improve dashboard reporting and scenario comparison.
 
-The original `supply_chain_optimization.py`, notebook, and six Excel files are retained as reference material. The original code's manufacturing plant model uses different entities and unit assumptions; it is not called by the new restaurant-distributor app. Reconcile its `/1000` and `*1000` conversions with source units before reusing its original sample results.
+## Author
 
-## Historical sales → demand estimates
+**Abhishek babu**  
+B.Tech — Artificial Intelligence & Machine Learning
 
-The app has an optional historical-sales conversion workflow and a downloadable `historical_sales_to_demand.csv` template. Required fields are `restaurant_id, sku, observed_sales_qty, base_units_per_sale, observed_period_days, planning_period_days`. The sales-to-base-unit factor must be sourced from a documented recipe/BOM or product mapping. This creates a demand estimate only; it does not make missing operating costs or inventory into real data. Review the output before using it in the optimizer.
+GitHub: https://github.com/abhishek1514
+
+---
+
+*FreshCast is an academic decision-support prototype. Validate all operational inputs and optimization outputs before using them for real distribution decisions.*
